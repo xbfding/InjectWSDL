@@ -1,9 +1,10 @@
 import json
 import logging
+import os
 import time
 
 import requests
-from Common.logger import setup_logger, get_logger
+from Common.logger import get_logger
 
 logger = get_logger(__name__)
 
@@ -11,7 +12,7 @@ logger = get_logger(__name__)
 def get_version(api_url):
     """获取 sqlmap 版本信息"""
     try:
-        response = requests.get(f"{api_url}/version")
+        response = requests.get(f"{api_url}/version", verify=False)
         if response.status_code == 200:
             return response.json()
         return None
@@ -23,7 +24,7 @@ def get_version(api_url):
 def is_server_running(api_url):
     """检查服务器是否运行"""
     try:
-        response = requests.get(f"{api_url}/version", timeout=5)
+        response = requests.get(f"{api_url}/version", timeout=5, verify=False)
         return response.status_code == 200
     except:
         return False
@@ -32,7 +33,7 @@ def is_server_running(api_url):
 def create_new_task(api_url):
     """创建任务ID"""
     try:
-        response = requests.get(f"{api_url}/task/new")
+        response = requests.get(f"{api_url}/task/new", verify=False)
         if response.status_code == 200:
             task_id = response.json()['taskid']
             logger.debug(f"创建新任务ID成功，任务ID: {task_id}")
@@ -48,7 +49,7 @@ def create_new_task(api_url):
 def delete_task(api_url, task_id):
     """删除任务"""
     try:
-        response = requests.get(f"{api_url}/task/{task_id}/delete")
+        response = requests.get(f"{api_url}/task/{task_id}/delete", verify=False)
         if response.status_code == 200:
             logger.debug(f"任务 {task_id} 删除成功")
             return True
@@ -102,6 +103,7 @@ def start_scan(api_url, task_id, req_type, target_url, target_headers, target_bo
             #     "http": "http://127.0.0.1:8083",
             #     "https": "http://127.0.0.1:8083",
             # }
+            verify=False
         )
         if response.status_code == 200:
             result = response.json()
@@ -115,7 +117,9 @@ def start_scan(api_url, task_id, req_type, target_url, target_headers, target_bo
             logger.error(f"启动扫描失败: {response.text}")
             return False
 
-
+    except KeyboardInterrupt:
+        print("\nCurl+C Exit...")
+        os._exit(0)
     except Exception as e:
         logger.error(f"启动扫描异常: {e}")
         return False
@@ -124,7 +128,7 @@ def start_scan(api_url, task_id, req_type, target_url, target_headers, target_bo
 def get_scan_status(api_url, task_id):
     """获取扫描状态"""
     try:
-        response = requests.get(f"{api_url}/scan/{task_id}/status")
+        response = requests.get(f"{api_url}/scan/{task_id}/status", verify=False)
         if response.status_code == 200:
             return response.json()
         return None
@@ -135,7 +139,7 @@ def get_scan_status(api_url, task_id):
 def get_scan_data(api_url, task_id):
     """获取扫描数据"""
     try:
-        response = requests.get(f"{api_url}/scan/{task_id}/data")
+        response = requests.get(f"{api_url}/scan/{task_id}/data", verify=False)
         if response.status_code == 200:
             return response.json()
         return None
@@ -146,7 +150,7 @@ def get_scan_data(api_url, task_id):
 def get_scan_log(api_url, task_id):
     """获取扫描日志"""
     try:
-        response = requests.get(f"{api_url}/scan/{task_id}/log")
+        response = requests.get(f"{api_url}/scan/{task_id}/log", verify=False)
         if response.status_code == 200:
             return response.json()
         return None
@@ -186,11 +190,11 @@ def get_final_results(api_url, task_id):
                 return True, data_log
 
             else:
-                logger.debug("\n未发现SQL注入漏洞")
-                return False
+                logger.debug("未发现SQL注入漏洞")
+                return False, None
         else:
-            logger.error("\n无法获取扫描结果")
-            return False
+            logger.error("无法获取扫描结果")
+            return False, None
 
     except Exception as e:
         logger.error(f"获取最终结果异常: {e}")
@@ -199,7 +203,7 @@ def get_final_results(api_url, task_id):
 def stop_scan(api_url, task_id):
     """停止扫描"""
     try:
-        response = requests.get(f"{api_url}/scan/{task_id}/stop")
+        response = requests.get(f"{api_url}/scan/{task_id}/stop", verify=False)
         if response.status_code == 200:
             logger.debug(f"扫描任务 {task_id} 已停止")
             return True
@@ -210,7 +214,7 @@ def stop_scan(api_url, task_id):
 
 def monitor_scan_progress(api_url, task_id, check_interval=5):
     """监控扫描进度并实时返回结果"""
-    logger.debug(f"\n开始监控任务 {task_id} 的进度...")
+    logger.debug(f"开始监控任务 {task_id} 的进度...")
     logger.debug("=" * 60)
 
     last_log_count = 0
@@ -242,17 +246,17 @@ def monitor_scan_progress(api_url, task_id, check_interval=5):
 
             # 检查是否完成
             if current_status in ['terminated', 'finished']:
-                logger.debug(f"\n任务 {task_id} 已完成，状态: {current_status}")
+                logger.debug(f"任务 {task_id} 已完成，状态: {current_status}")
                 break
 
             time.sleep(check_interval)
 
         except KeyboardInterrupt:
-            logger.error(f"\n用户中断，停止监控任务 {task_id}")
+            logger.error(f"用户中断，停止监控任务 {task_id}")
             stop_scan(api_url, task_id)
             break
         except Exception as e:
-            logger.error(f"\n监控异常: {e}")
+            logger.error(f"监控异常: {e}")
             break
 
     # 获取最终结果
@@ -261,13 +265,10 @@ def monitor_scan_progress(api_url, task_id, check_interval=5):
     b, data = get_final_results(api_url, task_id)
     if b:
         return True, data
-    return False
+    return False, None
 
 
 def client_main(api_url, req_type, target_url, target_headers=None, target_body=None, proxy=None):
-    while not is_server_running(api_url):
-        logger.error("sqlmap-api后端未启动成功! 十秒后重试!")
-        time.sleep(10)
 
     task_id = create_new_task(api_url)
     if len(task_id) > 0:
@@ -277,4 +278,4 @@ def client_main(api_url, req_type, target_url, target_headers=None, target_body=
         b, log_data = monitor_scan_progress(api_url, task_id, check_interval=5)
         if b:
             return True, log_data
-        return False
+        return False, None

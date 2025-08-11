@@ -2,7 +2,7 @@
 
 ## 介绍
 对WSDL接口自动进行SQL注入测试，可以自动爬取接口信息，并填充信息进行SQL注入测试。SQL注入检测依赖sqlmapApi工具。
-输入以下页面的网站，将自动爬取测试。
+输入以下页面的网站，将自动爬取测试。~~代码写的有点潦草，见笑了~~~
 ![img.png](img.png)
 ## 准备环境
 使用的python3环境
@@ -42,5 +42,6 @@ optional arguments:
                         日志显示等级info,error,debug
   -v, --version         show program's version number and exit
 ```
+
 ## Thanks
 - [sqlmap](https://github.com/sqlmapproject/sqlmap.git)
